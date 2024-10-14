@@ -20,7 +20,11 @@ def load_data():
     """
     df = pd.read_sql_query(query, engine)
     df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df.fillna(0, inplace=True)  # Replace null values with 0
     return df
+
+# Page config for dark mode and wide layout
+st.set_page_config(page_title="Gizmo Meme Coin Dashboard", layout="wide", page_icon=":rocket:", initial_sidebar_state="expanded")
 
 # Load data
 st.title("Gizmo Meme Coin Dashboard")
@@ -59,14 +63,15 @@ col2.metric("Total Balance", f"{total_balance:,.2f}")
 col3.metric("Total Unrealized Profit", f"{total_unrealized_profit:,.2f} BTC")
 col4.metric("Average Profit Multiplier", f"{average_num_xs_profit:.2f}x")
 
-# Holders Over Time
+# Fixing Holders Over Time
 st.header("Holders Over Time")
 holders_over_time = df[df['balance'] > 0].groupby(
     df['timestamp'].dt.date)['address'].nunique().reset_index()
 holders_over_time.columns = ['Date', 'Unique Holders']
 fig_holders = px.line(
     holders_over_time, x='Date', y='Unique Holders',
-    title='Number of Unique Holders Over Time')
+    title='Number of Unique Holders Over Time',
+    labels={'Date': 'Date', 'Unique Holders': 'Number of Holders'})
 st.plotly_chart(fig_holders, use_container_width=True)
 
 # Adjusted Balance Distribution
@@ -82,99 +87,72 @@ fig_balance_dist = px.bar(
     title='Distribution of Holder Balances')
 st.plotly_chart(fig_balance_dist, use_container_width=True)
 
-# Top Holders Analysis
-st.header("Top Holders Analysis")
+# Top Holders Buying and Selling Activity
+st.header("Top Holders Trading Activity")
 top_n = st.slider('Select Number of Top Holders to Display', min_value=10, max_value=100, value=20, step=10)
 top_holders = current_df.nlargest(top_n, 'balance')
 
-# Display Top Holders Table
-st.subheader(f"Top {top_n} Holders")
-st.dataframe(top_holders[['address', 'balance', 'unrealized_profit', 'num_xs_profit']])
-
-# Top Holders Balances Chart
-fig_top_holders = px.bar(
-    top_holders.sort_values(by='balance', ascending=False),
-    x='address', y='balance',
-    labels={'address': 'Address', 'balance': 'Balance'},
-    title=f'Top {top_n} Holders by Balance')
-st.plotly_chart(fig_top_holders, use_container_width=True)
-
-# Trading Activity of Top Holders
-st.subheader(f"Trading Activity of Top {top_n} Holders")
-activity_cols = [
-    'quantity_bought', 'value_bought_btc', 'quantity_sold', 'value_sold_btc',
-    'quantity_bought_1h', 'quantity_sold_1h',
-    'quantity_bought_4h', 'quantity_sold_4h',
-    'quantity_bought_24h', 'quantity_sold_24h',
-    'quantity_bought_7d', 'quantity_sold_7d'
-]
-top_holders_activity = top_holders[['address'] + activity_cols]
-st.dataframe(top_holders_activity)
-
-# Price Levels of Buying and Selling
-st.subheader("Price Levels of Buying and Selling by Top Holders")
-# Calculate average price per unit in BTC
-top_holders_activity['avg_buy_price_btc'] = top_holders_activity['value_bought_btc'] / top_holders_activity['quantity_bought']
-top_holders_activity['avg_sell_price_btc'] = top_holders_activity['value_sold_btc'] / top_holders_activity['quantity_sold']
-
-price_levels = top_holders_activity[['address', 'avg_buy_price_btc', 'avg_sell_price_btc']]
-st.dataframe(price_levels)
-
-# Plotting Average Buy and Sell Prices
-fig_price_levels = go.Figure()
-fig_price_levels.add_trace(go.Bar(
-    x=price_levels['address'],
-    y=price_levels['avg_buy_price_btc'],
-    name='Avg Buy Price',
-    marker_color='green'
-))
-fig_price_levels.add_trace(go.Bar(
-    x=price_levels['address'],
-    y=price_levels['avg_sell_price_btc'],
-    name='Avg Sell Price',
-    marker_color='red'
-))
-fig_price_levels.update_layout(
-    barmode='group',
-    xaxis_title='Address',
-    yaxis_title='Price (BTC)',
-    title='Average Buy and Sell Prices of Top Holders'
-)
-st.plotly_chart(fig_price_levels, use_container_width=True)
-
-# Additional Metrics from Existing Metrics
-st.header("Additional Metrics")
-# Example: Profitability Ratio
-current_df['profitability_ratio'] = current_df['unrealized_profit'] / current_df['balance']
-profitability_df = current_df[['address', 'balance', 'unrealized_profit', 'profitability_ratio']]
-st.dataframe(profitability_df.sort_values(by='profitability_ratio', ascending=False).head(20))
-
-# Trading Volumes Over Time
-st.header("Trading Volumes Over Time (All Holders)")
+# Split top holders into separate Buy and Sell tables
+st.subheader(f"Top {top_n} Buyers and Sellers")
 interval_options = ['1h', '4h', '24h', '7d']
-selected_interval = st.selectbox('Select Time Interval for Trading Volumes', interval_options)
+selected_interval = st.selectbox('Select Time Interval for Buy/Sell Activity', interval_options)
 
 quantity_bought_col = f'quantity_bought_{selected_interval}'
 quantity_sold_col = f'quantity_sold_{selected_interval}'
 
-# Aggregate trading volumes over time
-trading_volumes_over_time = df.groupby(df['timestamp'].dt.date).agg({
-    quantity_bought_col: 'sum',
-    quantity_sold_col: 'sum'
-}).reset_index().fillna(0)
+top_buyers = top_holders[top_holders[quantity_bought_col] > 0].sort_values(by=quantity_bought_col, ascending=False)
+top_sellers = top_holders[top_holders[quantity_sold_col] > 0].sort_values(by=quantity_sold_col, ascending=False)
 
-# Plot trading volumes
-fig_trading_volumes = go.Figure()
-fig_trading_volumes.add_trace(go.Bar(
-    x=trading_volumes_over_time['timestamp'], y=trading_volumes_over_time[quantity_bought_col],
-    name='Quantity Bought', marker_color='green'))
-fig_trading_volumes.add_trace(go.Bar(
-    x=trading_volumes_over_time['timestamp'], y=trading_volumes_over_time[quantity_sold_col],
-    name='Quantity Sold', marker_color='red'))
-fig_trading_volumes.update_layout(
-    barmode='group', xaxis_title='Date', yaxis_title='Quantity',
-    title=f'Trading Volumes Over Time ({selected_interval} Interval)')
-st.plotly_chart(fig_trading_volumes, use_container_width=True)
+col1, col2 = st.columns(2)
+with col1:
+    st.subheader(f"Top Buyers in {selected_interval}")
+    st.dataframe(top_buyers[['address', quantity_bought_col, 'value_bought_btc']])
+
+with col2:
+    st.subheader(f"Top Sellers in {selected_interval}")
+    st.dataframe(top_sellers[['address', quantity_sold_col, 'value_sold_btc']])
+
+# Unique Buyers and Sellers Over Time
+st.header("Unique Buyers and Sellers Over Time")
+buyers_sellers_over_time = df.groupby(df['timestamp'].dt.date).agg({
+    'quantity_bought': 'nunique',
+    'quantity_sold': 'nunique'
+}).reset_index()
+buyers_sellers_over_time.columns = ['Date', 'Unique Buyers', 'Unique Sellers']
+
+fig_buyers_sellers = go.Figure()
+fig_buyers_sellers.add_trace(go.Scatter(
+    x=buyers_sellers_over_time['Date'], y=buyers_sellers_over_time['Unique Buyers'],
+    mode='lines+markers', name='Unique Buyers', marker_color='green'))
+fig_buyers_sellers.add_trace(go.Scatter(
+    x=buyers_sellers_over_time['Date'], y=buyers_sellers_over_time['Unique Sellers'],
+    mode='lines+markers', name='Unique Sellers', marker_color='red'))
+fig_buyers_sellers.update_layout(
+    xaxis_title='Date', yaxis_title='Count',
+    title='Number of Unique Buyers and Sellers Over Time')
+st.plotly_chart(fig_buyers_sellers, use_container_width=True)
+
+# Price Over Time
+st.header("Price Over Time")
+df['price_bought'] = df['value_bought_btc'] / df['quantity_bought'].replace(0, np.nan)
+df['price_sold'] = df['value_sold_btc'] / df['quantity_sold'].replace(0, np.nan)
+
+price_over_time = df.groupby(df['timestamp'].dt.date).agg({
+    'price_bought': 'mean',
+    'price_sold': 'mean'
+}).reset_index()
+
+fig_price_over_time = go.Figure()
+fig_price_over_time.add_trace(go.Scatter(
+    x=price_over_time['timestamp'], y=price_over_time['price_bought'],
+    mode='lines', name='Average Buy Price', marker_color='blue'))
+fig_price_over_time.add_trace(go.Scatter(
+    x=price_over_time['timestamp'], y=price_over_time['price_sold'],
+    mode='lines', name='Average Sell Price', marker_color='orange'))
+fig_price_over_time.update_layout(
+    xaxis_title='Date', yaxis_title='BTC Price',
+    title='Average Buy and Sell Prices Over Time')
+st.plotly_chart(fig_price_over_time, use_container_width=True)
 
 # Footer
 st.markdown("""
