@@ -5,7 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 
-# Function to load data from the PostgreSQL database
+# Function to load data from the PostgreSQL database and handle NULL values
 @st.cache_data(ttl=60)
 def load_data():
     # Retrieve database credentials from Streamlit secrets
@@ -19,8 +19,25 @@ def load_data():
     SELECT * FROM gizmo_holders_balances_history;
     """
     df = pd.read_sql_query(query, engine)
+    
     # Correctly parse timestamps with timezone information
     df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
+    
+    # Replace [NULL] or missing values
+    df.fillna({
+        'quantity_bought': 0, 'value_bought_btc': 0,
+        'quantity_bought_1h': 0, 'value_bought_1h_btc': 0,
+        'quantity_bought_4h': 0, 'value_bought_4h_btc': 0,
+        'quantity_bought_24h': 0, 'value_bought_24h_btc': 0,
+        'quantity_bought_7d': 0, 'value_bought_7d_btc': 0,
+        'quantity_sold': 0, 'avg_quantity_sold': 0,
+        'value_sold_btc': 0, 'quantity_sold_1h': 0,
+        'value_sold_1h_btc': 0, 'quantity_sold_4h': 0,
+        'value_sold_4h_btc': 0, 'quantity_sold_24h': 0,
+        'value_sold_24h_btc': 0, 'quantity_sold_7d': 0,
+        'value_sold_7d_btc': 0
+    }, inplace=True)
+
     return df
 
 # Load data
@@ -103,7 +120,7 @@ quantity_sold_col = f'quantity_sold_{selected_interval}'
 value_bought_col = f'value_bought_{selected_interval}'
 value_sold_col = f'value_sold_{selected_interval}'
 
-# Ensure columns exist in the dataframe
+# Check if the columns exist; if not, initialize them to 0 to avoid errors
 for col in [quantity_bought_col, quantity_sold_col, value_bought_col, value_sold_col]:
     if col not in df.columns:
         df[col] = 0
