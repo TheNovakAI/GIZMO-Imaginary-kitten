@@ -65,13 +65,13 @@ col4.metric("Average Profit Multiplier", f"{average_num_xs_profit:.2f}x")
 
 # Fixing Holders Over Time
 st.header("Holders Over Time")
-holders_over_time = df[df['balance'] > 0].groupby(
-    df['timestamp'].dt.date)['address'].nunique().reset_index()
-holders_over_time.columns = ['Date', 'Unique Holders']
+# Use full timestamps to show precise lines
+holders_over_time = df[df['balance'] > 0].groupby('timestamp')['address'].nunique().reset_index()
+holders_over_time.columns = ['Timestamp', 'Unique Holders']
 fig_holders = px.line(
-    holders_over_time, x='Date', y='Unique Holders',
+    holders_over_time, x='Timestamp', y='Unique Holders',
     title='Number of Unique Holders Over Time',
-    labels={'Date': 'Date', 'Unique Holders': 'Number of Holders'})
+    labels={'Timestamp': 'Timestamp', 'Unique Holders': 'Number of Holders'})
 st.plotly_chart(fig_holders, use_container_width=True)
 
 # Adjusted Balance Distribution
@@ -112,32 +112,32 @@ with col2:
     st.subheader(f"Top Sellers in {selected_interval}")
     st.dataframe(top_sellers[['address', quantity_sold_col, 'value_sold_btc']])
 
-# Unique Buyers and Sellers Over Time
+# Unique Buyers and Sellers Over Time (Use full timestamp for precise lines)
 st.header("Unique Buyers and Sellers Over Time")
-buyers_sellers_over_time = df.groupby(df['timestamp'].dt.date).agg({
+buyers_sellers_over_time = df.groupby('timestamp').agg({
     'quantity_bought': 'nunique',
     'quantity_sold': 'nunique'
 }).reset_index()
-buyers_sellers_over_time.columns = ['Date', 'Unique Buyers', 'Unique Sellers']
+buyers_sellers_over_time.columns = ['Timestamp', 'Unique Buyers', 'Unique Sellers']
 
 fig_buyers_sellers = go.Figure()
 fig_buyers_sellers.add_trace(go.Scatter(
-    x=buyers_sellers_over_time['Date'], y=buyers_sellers_over_time['Unique Buyers'],
+    x=buyers_sellers_over_time['Timestamp'], y=buyers_sellers_over_time['Unique Buyers'],
     mode='lines+markers', name='Unique Buyers', marker_color='green'))
 fig_buyers_sellers.add_trace(go.Scatter(
-    x=buyers_sellers_over_time['Date'], y=buyers_sellers_over_time['Unique Sellers'],
+    x=buyers_sellers_over_time['Timestamp'], y=buyers_sellers_over_time['Unique Sellers'],
     mode='lines+markers', name='Unique Sellers', marker_color='red'))
 fig_buyers_sellers.update_layout(
-    xaxis_title='Date', yaxis_title='Count',
+    xaxis_title='Timestamp', yaxis_title='Count',
     title='Number of Unique Buyers and Sellers Over Time')
 st.plotly_chart(fig_buyers_sellers, use_container_width=True)
 
-# Price Over Time
+# Price Over Time (Use full timestamp)
 st.header("Price Over Time")
 df['price_bought'] = df['value_bought_btc'] / df['quantity_bought'].replace(0, np.nan)
 df['price_sold'] = df['value_sold_btc'] / df['quantity_sold'].replace(0, np.nan)
 
-price_over_time = df.groupby(df['timestamp'].dt.date).agg({
+price_over_time = df.groupby('timestamp').agg({
     'price_bought': 'mean',
     'price_sold': 'mean'
 }).reset_index()
@@ -150,7 +150,7 @@ fig_price_over_time.add_trace(go.Scatter(
     x=price_over_time['timestamp'], y=price_over_time['price_sold'],
     mode='lines', name='Average Sell Price', marker_color='orange'))
 fig_price_over_time.update_layout(
-    xaxis_title='Date', yaxis_title='BTC Price',
+    xaxis_title='Timestamp', yaxis_title='BTC Price',
     title='Average Buy and Sell Prices Over Time')
 st.plotly_chart(fig_price_over_time, use_container_width=True)
 
