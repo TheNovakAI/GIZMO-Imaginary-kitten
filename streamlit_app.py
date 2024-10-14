@@ -60,17 +60,24 @@ col2.metric("Total Balance", f"{total_balance:,.2f}")
 col3.metric("Total Unrealized Profit", f"{total_unrealized_profit:,.6f} BTC")
 col4.metric("Average Profit Multiplier", f"{average_num_xs_profit:.2f}x")
 
-# Holders Over Time
-st.header("Holders Over Time")
-# Group by timestamp (date only) and count unique addresses with balance > 0
-holders_over_time = df[df['balance'] > 0].groupby(
-    df['timestamp'].dt.floor('T'))['address'].nunique().reset_index()
-holders_over_time.columns = ['Timestamp', 'Unique Holders']
-fig_holders = px.line(
-    holders_over_time, x='Timestamp', y='Unique Holders',
-    title='Number of Unique Holders Over Time')
-fig_holders.update_layout(xaxis_title='Timestamp', yaxis_title='Number of Holders')
-st.plotly_chart(fig_holders, use_container_width=True)
+# Buyers and Sellers Over Time Chart
+st.header("Unique Buyers and Sellers Over Time")
+buyers_sellers_over_time = df.groupby(df['timestamp'].dt.floor('T')).agg({
+    'quantity_bought': lambda x: x.notnull().sum(),
+    'quantity_sold': lambda x: x.notnull().sum()
+}).reset_index()
+
+fig_buyers_sellers = go.Figure()
+fig_buyers_sellers.add_trace(go.Scatter(
+    x=buyers_sellers_over_time['timestamp'], y=buyers_sellers_over_time['quantity_bought'],
+    mode='lines', name='Unique Buyers'))
+fig_buyers_sellers.add_trace(go.Scatter(
+    x=buyers_sellers_over_time['timestamp'], y=buyers_sellers_over_time['quantity_sold'],
+    mode='lines', name='Unique Sellers'))
+fig_buyers_sellers.update_layout(
+    xaxis_title='Timestamp', yaxis_title='Number of Unique Buyers/Sellers',
+    title='Unique Buyers and Sellers Over Time')
+st.plotly_chart(fig_buyers_sellers, use_container_width=True)
 
 # Adjusted Balance Distribution
 st.header("Balance Distribution")
@@ -85,87 +92,62 @@ fig_balance_dist = px.bar(
     title='Distribution of Holder Balances')
 st.plotly_chart(fig_balance_dist, use_container_width=True)
 
-# Top Holders Analysis
-st.header("Top Holders Analysis")
-top_n = st.slider('Select Number of Top Holders to Display', min_value=10, max_value=100, value=20, step=10)
-top_holders = current_df.nlargest(top_n, 'balance')
-
-# Display Top Holders Table
-st.subheader(f"Top {top_n} Holders")
-st.dataframe(top_holders[['address', 'balance', 'unrealized_profit', 'num_xs_profit']])
-
-# Top Holders Balances Chart
-fig_top_holders = px.bar(
-    top_holders.sort_values(by='balance', ascending=False),
-    x='address', y='balance',
-    labels={'address': 'Address', 'balance': 'Balance'},
-    title=f'Top {top_n} Holders by Balance')
-fig_top_holders.update_layout(xaxis_tickangle=-45)
-st.plotly_chart(fig_top_holders, use_container_width=True)
-
-# Trading Activity of Top Holders
-st.subheader(f"Trading Activity of Top {top_n} Holders")
-activity_cols = [
-    'quantity_bought', 'value_bought_btc', 'quantity_sold', 'value_sold_btc',
-    'quantity_bought_1h', 'quantity_sold_1h',
-    'quantity_bought_4h', 'quantity_sold_4h',
-    'quantity_bought_24h', 'quantity_sold_24h',
-    'quantity_bought_7d', 'quantity_sold_7d'
-]
-top_holders_activity = top_holders[['address'] + activity_cols]
-st.dataframe(top_holders_activity)
-
-# Remove average price columns since they are no longer needed
-# Check if there is duplication of buyers/sellers or imbalance
-st.header("Buyers and Sellers Integrity Check")
-total_buyers = current_df[current_df['quantity_bought'] > 0]['address'].nunique()
-total_sellers = current_df[current_df['quantity_sold'] > 0]['address'].nunique()
-
-# Check for duplicates and remove them if necessary
-unique_buyers = current_df[current_df['quantity_bought'] > 0]['address'].unique()
-unique_sellers = current_df[current_df['quantity_sold'] > 0]['address'].unique()
-
-# Report findings
-col_b1, col_b2 = st.columns(2)
-col_b1.metric("Unique Buyers", f"{total_buyers}")
-col_b2.metric("Unique Sellers", f"{total_sellers}")
-
-if total_buyers != total_sellers:
-    st.warning(f"Note: There are {total_buyers - total_sellers} more buyers than sellers. Check for data inconsistencies.")
-else:
-    st.success("The number of buyers and sellers is balanced.")
-
-# Trading Volumes Over Time
-st.header("Trading Volumes Over Time (All Holders)")
+# Top Holders Recent Buys and Sells by Interval
+st.header("Top Holders' Recent Buys and Sells by Time Intervals")
 interval_options = ['1h', '4h', '24h', '7d']
-selected_interval = st.selectbox('Select Time Interval for Trading Volumes', interval_options)
+top_n = st.slider('Select Number of Top Holders to Display', min_value=10, max_value=100, value=20, step=10)
+selected_interval = st.selectbox('Select Time Interval for Analysis', interval_options)
 
 quantity_bought_col = f'quantity_bought_{selected_interval}'
 quantity_sold_col = f'quantity_sold_{selected_interval}'
+value_bought_col = f'value_bought_{selected_interval}'
+value_sold_col = f'value_sold_{selected_interval}'
 
 # Ensure columns exist in the dataframe
-for col in [quantity_bought_col, quantity_sold_col]:
+for col in [quantity_bought_col, quantity_sold_col, value_bought_col, value_sold_col]:
     if col not in df.columns:
         df[col] = 0
 
-# Aggregate trading volumes over time
-trading_volumes_over_time = df.groupby(df['timestamp'].dt.floor('T')).agg({
+top_holders = current_df.nlargest(top_n, 'balance')
+
+# Display Top Holders Table
+st.subheader(f"Top {top_n} Holders Recent Buys and Sells")
+st.dataframe(top_holders[['address', 'balance', quantity_bought_col, value_bought_col, quantity_sold_col, value_sold_col]])
+
+# Plot Buys and Sells for Top Holders by Interval
+fig_top_holders_buys_sells = go.Figure()
+fig_top_holders_buys_sells.add_trace(go.Bar(
+    x=top_holders['address'], y=top_holders[quantity_bought_col],
+    name='Buys', marker_color='green'))
+fig_top_holders_buys_sells.add_trace(go.Bar(
+    x=top_holders['address'], y=top_holders[quantity_sold_col],
+    name='Sells', marker_color='red'))
+fig_top_holders_buys_sells.update_layout(
+    barmode='group', xaxis_title='Address', yaxis_title='Quantity',
+    title=f'Top {top_n} Holders - Buys and Sells ({selected_interval} Interval)',
+    xaxis_tickangle=-45)
+st.plotly_chart(fig_top_holders_buys_sells, use_container_width=True)
+
+# Summary Table for Total Buys and Sells by Time Interval
+st.header(f"Total Buys and Sells Over {selected_interval} Interval")
+total_summary = current_df.groupby(df['timestamp'].dt.floor('T')).agg({
     quantity_bought_col: 'sum',
     quantity_sold_col: 'sum'
-}).reset_index().fillna(0)
+}).reset_index()
 
-# Plot trading volumes
-fig_trading_volumes = go.Figure()
-fig_trading_volumes.add_trace(go.Bar(
-    x=trading_volumes_over_time['timestamp'], y=trading_volumes_over_time[quantity_bought_col],
-    name='Quantity Bought', marker_color='green'))
-fig_trading_volumes.add_trace(go.Bar(
-    x=trading_volumes_over_time['timestamp'], y=trading_volumes_over_time[quantity_sold_col],
-    name='Quantity Sold', marker_color='red'))
-fig_trading_volumes.update_layout(
-    barmode='group', xaxis_title='Timestamp', yaxis_title='Quantity',
-    title=f'Trading Volumes Over Time ({selected_interval} Interval)')
-st.plotly_chart(fig_trading_volumes, use_container_width=True)
+st.subheader(f"Total Buys and Sells Over {selected_interval}")
+st.dataframe(total_summary)
+
+# Buys Volume Over Time (Changed from Buys and Sells)
+st.header("Buy Volume Over Time")
+buy_volume_over_time = df.groupby(df['timestamp'].dt.floor('T'))[quantity_bought_col].sum().reset_index()
+
+fig_buy_volume = px.bar(
+    buy_volume_over_time, x='timestamp', y=quantity_bought_col,
+    title=f'Buy Volume Over Time ({selected_interval} Interval)',
+    labels={quantity_bought_col: 'Buy Volume', 'timestamp': 'Timestamp'})
+fig_buy_volume.update_layout(xaxis_title='Timestamp', yaxis_title='Buy Volume')
+st.plotly_chart(fig_buy_volume, use_container_width=True)
 
 # Footer
 st.markdown("""
