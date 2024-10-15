@@ -5,46 +5,35 @@ import plotly.graph_objects as go
 import numpy as np
 
 # Function to load data from the PostgreSQL database
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=60)
 def load_data():
-    try:
-        # Retrieve database credentials from Streamlit secrets
-        db_credentials = st.secrets["postgres"]
-        connection_string = (
-            f"postgresql://{db_credentials['user']}:{db_credentials['password']}"
-            f"@{db_credentials['host']}:{db_credentials['port']}/{db_credentials['dbname']}"
-        )
-        engine = create_engine(connection_string)
-
-        # Only select necessary columns for initial load
-        query = """
-        SELECT timestamp, address, balance, unrealized_profit,
-               value_bought_4h_btc, quantity_bought_4h
-        FROM gizmo_holders_balances_history;
-        """
-        df = pd.read_sql_query(query, engine)
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
-        df.fillna(0, inplace=True)  # Replace null values with 0
-        
-        # Close the connection after loading the data
-        engine.dispose()
-        return df
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-        st.stop()  # Stop the app if there's an error loading data
+    # Retrieve database credentials from Streamlit secrets
+    db_credentials = st.secrets["postgres"]
+    connection_string = (
+        f"postgresql://{db_credentials['user']}:{db_credentials['password']}"
+        f"@{db_credentials['host']}:{db_credentials['port']}/{db_credentials['dbname']}"
+    )
+    engine = create_engine(connection_string)
+    query = """
+    SELECT * FROM gizmo_holders_balances_history;
+    """
+    df = pd.read_sql_query(query, engine)
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df.fillna(0, inplace=True)  # Replace null values with 0
+    return df
 
 # Page config for dark mode and wide layout
 st.set_page_config(page_title="Gizmo Meme Coin Dashboard", layout="wide", page_icon=":rocket:", initial_sidebar_state="expanded")
 
-# Load data into cache with a loading spinner
+# Load data into cache
 st.title("Gizmo Meme Coin Dashboard")
 st.markdown("""
 Welcome to the Gizmo Meme Coin Dashboard! Explore trading metrics, holders' data, and market trends to make informed trading decisions.
 """)
 
-data_load_state = st.text('Loading data... Please wait...')
+data_load_state = st.text('Loading data...')
 df = load_data()
-data_load_state.text('Data loaded successfully!')
+data_load_state.text('')
 
 # Use the latest timestamp for current data
 latest_timestamp = df['timestamp'].max()
@@ -161,10 +150,9 @@ price_vs_profit = df.groupby('timestamp').agg({
 }).reset_index()
 
 # Calculate average price as sats per token (total value_bought / total quantity_bought for each timestamp)
-price_vs_profit['avg_price_bought_sats'] = np.where(
-    price_vs_profit['quantity_bought_4h'] > 0,
-    (price_vs_profit['value_bought_4h_btc'] / price_vs_profit['quantity_bought_4h']) / 0.00000001,
-    0
+price_vs_profit['avg_price_bought_sats'] = price_vs_profit.apply(
+    lambda row: (row['value_bought_4h_btc'] / row['quantity_bought_4h']) / 0.00000001 
+    if row['quantity_bought_4h'] > 0 else 0, axis=1
 )
 
 # Find the max values for both y-axes to synchronize their percentage-based scaling
