@@ -65,7 +65,7 @@ total_unrealized_profit = active_holders['unrealized_profit'].sum()
 
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Holders", f"{total_holders}")
-col2.metric("Total Balance", f"{total_balance:,.0f}")
+col2.metric("Total Balance", f"{total_balance}")
 col3.metric("Total Unrealized Profit", f"{total_unrealized_profit:,.2f} BTC")
 
 # Holders Over Time - Ensure all timestamps are shown
