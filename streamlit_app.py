@@ -1,3 +1,30 @@
+import streamlit as st
+import pandas as pd
+from sqlalchemy import create_engine
+import plotly.graph_objects as go
+import numpy as np
+
+# Function to load data from the PostgreSQL database
+@st.cache_data(ttl=60)
+def load_data():
+    # Retrieve database credentials from Streamlit secrets
+    db_credentials = st.secrets["postgres"]
+    connection_string = (
+        f"postgresql://{db_credentials['user']}:{db_credentials['password']}"
+        f"@{db_credentials['host']}:{db_credentials['port']}/{db_credentials['dbname']}"
+    )
+    engine = create_engine(connection_string)
+    query = """
+    SELECT * FROM gizmo_holders_balances_history;
+    """
+    df = pd.read_sql_query(query, engine)
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df.fillna(0, inplace=True)  # Replace null values with 0
+    return df
+
+# Page config for dark mode and wide layout
+st.set_page_config(page_title="Gizmo Meme Coin Dashboard", layout="wide", page_icon=":rocket:", initial_sidebar_state="expanded")
+
 # Load data into cache
 st.title("Gizmo Meme Coin Dashboard")
 st.markdown("""
@@ -30,15 +57,13 @@ if selected_addresses:
 
 # KPI Metrics
 st.header("Key Performance Indicators (KPIs)")
+# Only include holders with a balance > 0 for profit multiplier calculation
+active_holders = current_df[current_df['balance'] > 0]
+total_holders = active_holders['address'].nunique()
+total_balance = active_holders['balance'].sum()
+total_unrealized_profit = active_holders['unrealized_profit'].sum()
+average_num_xs_profit = active_holders['num_xs_profit'].mean()
 
-# Calculate metrics for holders with a balance > 0
-active_holders_df = current_df[current_df['balance'] > 0]
-total_holders = active_holders_df['address'].nunique()
-total_balance = active_holders_df['balance'].sum()
-total_unrealized_profit = active_holders_df['unrealized_profit'].sum()
-average_num_xs_profit = active_holders_df['num_xs_profit'].mean()
-
-# Display KPIs
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Holders", f"{total_holders}")
 col2.metric("Total Balance", f"{total_balance:,.2f}")
@@ -91,11 +116,13 @@ with col2:
     st.subheader(f"Top Sellers in {selected_interval}")
     st.dataframe(top_sellers[['address', quantity_sold_col, 'value_sold_btc']])
 
-# Unique Buyers and Sellers Over Time (non-cumulative, all timestamps shown)
+# Unique Buyers and Sellers Over Time (non-cumulative, showing unique addresses per interval)
 st.header("Unique Buyers and Sellers Over Time")
+
+# Aggregate unique buyers and sellers per timestamp (rolling window)
 buyers_sellers_over_time = df.groupby('timestamp').agg({
-    'quantity_bought': 'nunique',
-    'quantity_sold': 'nunique'
+    'quantity_bought_1h': 'nunique',
+    'quantity_sold_1h': 'nunique'
 }).reset_index()
 buyers_sellers_over_time.columns = ['Timestamp', 'Unique Buyers', 'Unique Sellers']
 
