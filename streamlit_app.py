@@ -16,14 +16,21 @@ def load_data():
     )
     engine = create_engine(connection_string)
     query = """
-    SELECT * FROM gizmo_holders_balances_history;
+    SELECT address, balance, current_btc_value, unrealized_profit, num_xs_profit, 
+           mintedtokens, transactionfeesbtc, quantity_bought, value_bought_btc, 
+           quantity_bought_1h, value_bought_1h_btc, quantity_bought_4h, value_bought_4h_btc, 
+           quantity_bought_24h, value_bought_24h_btc, quantity_bought_7d, value_bought_7d_btc, 
+           quantity_sold, avg_quantity_sold, value_sold_btc, quantity_sold_1h, value_sold_1h_btc, 
+           quantity_sold_4h, value_sold_4h_btc, quantity_sold_24h, value_sold_24h_btc, 
+           quantity_sold_7d, value_sold_7d_btc, "timestamp"
+    FROM public.gizmo_holders_balances_history;
     """
     df = pd.read_sql_query(query, engine)
-    
-    # Correctly parse timestamps with timezone information
+
+    # Correctly parse timestamps
     df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
-    
-    # Replace [NULL] or missing values
+
+    # Replace NULL values with appropriate defaults
     df.fillna({
         'quantity_bought': 0, 'value_bought_btc': 0,
         'quantity_bought_1h': 0, 'value_bought_1h_btc': 0,
@@ -120,7 +127,7 @@ quantity_sold_col = f'quantity_sold_{selected_interval}'
 value_bought_col = f'value_bought_{selected_interval}'
 value_sold_col = f'value_sold_{selected_interval}'
 
-# Check if the columns exist; if not, initialize them to 0 to avoid errors
+# Ensure necessary columns exist; initialize them with 0 if missing
 for col in [quantity_bought_col, quantity_sold_col, value_bought_col, value_sold_col]:
     if col not in df.columns:
         df[col] = 0
@@ -146,16 +153,18 @@ fig_top_holders_buys_sells.update_layout(
 st.plotly_chart(fig_top_holders_buys_sells, use_container_width=True)
 
 # Summary Table for Total Buys and Sells by Time Interval
-st.header(f"Total Buys and Sells Over {selected_interval} Interval")
-total_summary = current_df.groupby(df['timestamp'].dt.floor('T')).agg({
+st.header(f"Total Buys and Sells Over Time ({selected_interval} Interval)")
+total_buys_sells = current_df.agg({
     quantity_bought_col: 'sum',
-    quantity_sold_col: 'sum'
+    value_bought_col: 'sum',
+    quantity_sold_col: 'sum',
+    value_sold_col: 'sum'
 }).reset_index()
+total_buys_sells.columns = ['Metric', 'Total']
 
-st.subheader(f"Total Buys and Sells Over {selected_interval}")
-st.dataframe(total_summary)
+st.table(total_buys_sells)
 
-# Buys Volume Over Time (Changed from Buys and Sells)
+# Buy Volume Over Time
 st.header("Buy Volume Over Time")
 buy_volume_over_time = df.groupby(df['timestamp'].dt.floor('T'))[quantity_bought_col].sum().reset_index()
 
