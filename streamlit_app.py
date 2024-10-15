@@ -145,7 +145,7 @@ st.plotly_chart(fig_buyers_sellers, use_container_width=True)
 st.header("Unrealized Profit vs. Average Price Over Time (in Sats)")
 
 # Calculate average price as sats per token (using buys only)
-df['avg_price_bought_sats'] = (df['value_bought_1h_btc'] / df['quantity_bought_1h']) / 0.00000001
+df['avg_price_bought_sats'] = (df['value_bought_4h_btc'] / df['quantity_bought_4h']) / 0.00000001
 
 price_vs_profit = df.groupby(df['timestamp'].dt.floor('10min')).agg({
     'avg_price_bought_sats': 'mean',
