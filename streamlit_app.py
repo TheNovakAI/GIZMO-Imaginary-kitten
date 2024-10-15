@@ -16,7 +16,7 @@ def load_data():
     )
     engine = create_engine(connection_string)
     query = """
-    SELECT * FROM gizmo_holders_balances_history;
+    SELECT * FROM public.gizmo_holders_balances_history;
     """
     df = pd.read_sql_query(query, engine)
     df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -65,7 +65,6 @@ col4.metric("Average Profit Multiplier", f"{average_num_xs_profit:.2f}x")
 
 # Fixing Holders Over Time
 st.header("Holders Over Time")
-# Use full timestamps to show precise lines
 holders_over_time = df[df['balance'] > 0].groupby('timestamp')['address'].nunique().reset_index()
 holders_over_time.columns = ['Timestamp', 'Unique Holders']
 fig_holders = px.line(
@@ -99,18 +98,25 @@ selected_interval = st.selectbox('Select Time Interval for Buy/Sell Activity', i
 
 quantity_bought_col = f'quantity_bought_{selected_interval}'
 quantity_sold_col = f'quantity_sold_{selected_interval}'
+value_bought_col = f'value_bought_{selected_interval}_btc'
+value_sold_col = f'value_sold_{selected_interval}_btc'
 
-top_buyers = top_holders[top_holders[quantity_bought_col] > 0].sort_values(by=quantity_bought_col, ascending=False)
-top_sellers = top_holders[top_holders[quantity_sold_col] > 0].sort_values(by=quantity_sold_col, ascending=False)
+# Check if the columns exist in the data
+if quantity_bought_col in current_df.columns and quantity_sold_col in current_df.columns:
+    top_buyers = top_holders[top_holders[quantity_bought_col] > 0].sort_values(by=quantity_bought_col, ascending=False)
+    top_sellers = top_holders[top_holders[quantity_sold_col] > 0].sort_values(by=quantity_sold_col, ascending=False)
 
-col1, col2 = st.columns(2)
-with col1:
-    st.subheader(f"Top Buyers in {selected_interval}")
-    st.dataframe(top_buyers[['address', quantity_bought_col, 'value_bought_btc']])
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader(f"Top Buyers in {selected_interval}")
+        st.dataframe(top_buyers[['address', quantity_bought_col, value_bought_col]])
 
-with col2:
-    st.subheader(f"Top Sellers in {selected_interval}")
-    st.dataframe(top_sellers[['address', quantity_sold_col, 'value_sold_btc']])
+    with col2:
+        st.subheader(f"Top Sellers in {selected_interval}")
+        st.dataframe(top_sellers[['address', quantity_sold_col, value_sold_col]])
+
+else:
+    st.warning(f"Data for the selected interval ({selected_interval}) is not available.")
 
 # Unique Buyers and Sellers Over Time (Use full timestamp for precise lines)
 st.header("Unique Buyers and Sellers Over Time")
@@ -131,28 +137,6 @@ fig_buyers_sellers.update_layout(
     xaxis_title='Timestamp', yaxis_title='Count',
     title='Number of Unique Buyers and Sellers Over Time')
 st.plotly_chart(fig_buyers_sellers, use_container_width=True)
-
-# Price Over Time (Use full timestamp)
-st.header("Price Over Time")
-df['price_bought'] = df['value_bought_btc'] / df['quantity_bought'].replace(0, np.nan)
-df['price_sold'] = df['value_sold_btc'] / df['quantity_sold'].replace(0, np.nan)
-
-price_over_time = df.groupby('timestamp').agg({
-    'price_bought': 'mean',
-    'price_sold': 'mean'
-}).reset_index()
-
-fig_price_over_time = go.Figure()
-fig_price_over_time.add_trace(go.Scatter(
-    x=price_over_time['timestamp'], y=price_over_time['price_bought'],
-    mode='lines', name='Average Buy Price', marker_color='blue'))
-fig_price_over_time.add_trace(go.Scatter(
-    x=price_over_time['timestamp'], y=price_over_time['price_sold'],
-    mode='lines', name='Average Sell Price', marker_color='orange'))
-fig_price_over_time.update_layout(
-    xaxis_title='Timestamp', yaxis_title='BTC Price',
-    title='Average Buy and Sell Prices Over Time')
-st.plotly_chart(fig_price_over_time, use_container_width=True)
 
 # Footer
 st.markdown("""
