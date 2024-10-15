@@ -60,7 +60,7 @@ st.header("Key Performance Indicators (KPIs)")
 # Only include holders with a balance > 0 for profit multiplier calculation
 active_holders = current_df[current_df['balance'] > 0]
 total_holders = active_holders['address'].nunique()
-total_balance = active_holders['balance'].round(sum(),0)
+total_balance = round(active_holders['balance'].sum(),0)
 total_unrealized_profit = active_holders['unrealized_profit'].sum()
 
 col1, col2, col3 = st.columns(3)
