@@ -144,10 +144,10 @@ st.plotly_chart(fig_buyers_sellers, use_container_width=True)
 # Price Over Time and Unrealized Profit Comparison
 st.header("Unrealized Profit vs. Average Price Over Time (in Sats)")
 
-# Calculate average price as sats per token (using buys only)
-df['avg_price_bought_sats'] = (df['value_bought_1h_btc'] / df['quantity_bought_1h']) / 0.00000001
+# Calculate average price as sats per token (using buys only for last 4 hours)
+df['avg_price_bought_sats'] = (df['value_bought_4h_btc'] / df['quantity_bought_4h']) / 0.00000001
 
-price_vs_profit = df.groupby(df['timestamp'].dt.floor('10min')).agg({
+price_vs_profit = df.groupby('timestamp').agg({
     'avg_price_bought_sats': 'mean',
     'unrealized_profit': 'sum'
 }).reset_index()
@@ -162,14 +162,14 @@ fig_price_vs_profit.add_trace(go.Scatter(
 # Avg price bought in sats line
 fig_price_vs_profit.add_trace(go.Scatter(
     x=price_vs_profit['timestamp'], y=price_vs_profit['avg_price_bought_sats'],
-    mode='lines', name='Avg Price Bought (Sats)', yaxis='y2', line=dict(color='orange')))
+    mode='lines', name='Last 4 Hours Avg Price (Sats)', yaxis='y2', line=dict(color='orange')))
 
 # Layout for dual axis
 fig_price_vs_profit.update_layout(
-    title='Unrealized Profit vs. Avg Price Bought Over Time (Sats)',
+    title='Unrealized Profit vs. Last 4 Hours Avg Price (Sats)',
     xaxis=dict(title='Timestamp'),
     yaxis=dict(title='Unrealized Profit (BTC)', side='left'),
-    yaxis2=dict(title='Avg Price Bought (Sats)', overlaying='y', side='right'),
+    yaxis2=dict(title='Last 4 Hours Avg Price (Sats)', overlaying='y', side='right'),
     legend=dict(x=0.1, y=1.1)
 )
 
