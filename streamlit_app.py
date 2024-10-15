@@ -57,10 +57,12 @@ if selected_addresses:
 
 # KPI Metrics
 st.header("Key Performance Indicators (KPIs)")
-total_holders = current_df[current_df['balance'] > 0]['address'].nunique()
-total_balance = current_df['balance'].sum()
-total_unrealized_profit = current_df['unrealized_profit'].sum()
-average_num_xs_profit = current_df['num_xs_profit'].mean()
+# Only include holders with a balance > 0 for profit multiplier calculation
+active_holders = current_df[current_df['balance'] > 0]
+total_holders = active_holders['address'].nunique()
+total_balance = active_holders['balance'].sum()
+total_unrealized_profit = active_holders['unrealized_profit'].sum()
+average_num_xs_profit = active_holders['num_xs_profit'].mean()
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Holders", f"{total_holders}")
@@ -114,11 +116,13 @@ with col2:
     st.subheader(f"Top Sellers in {selected_interval}")
     st.dataframe(top_sellers[['address', quantity_sold_col, 'value_sold_btc']])
 
-# Unique Buyers and Sellers Over Time (non-cumulative, all timestamps shown)
+# Unique Buyers and Sellers Over Time (non-cumulative, showing unique addresses per interval)
 st.header("Unique Buyers and Sellers Over Time")
+
+# Aggregate unique buyers and sellers per timestamp (rolling window)
 buyers_sellers_over_time = df.groupby('timestamp').agg({
-    'quantity_bought': 'nunique',
-    'quantity_sold': 'nunique'
+    'quantity_bought_1h': 'nunique',
+    'quantity_sold_1h': 'nunique'
 }).reset_index()
 buyers_sellers_over_time.columns = ['Timestamp', 'Unique Buyers', 'Unique Sellers']
 
@@ -141,7 +145,7 @@ st.plotly_chart(fig_buyers_sellers, use_container_width=True)
 st.header("Unrealized Profit vs. Average Price Over Time (in Sats)")
 
 # Calculate average price as sats per token (using buys only)
-df['avg_price_bought_sats'] = (df['value_bought_4h_btc'] / df['quantity_bought_4h']) / 0.00000001
+df['avg_price_bought_sats'] = (df['value_bought_1h_btc'] / df['quantity_bought_1h']) / 0.00000001
 
 price_vs_profit = df.groupby(df['timestamp'].dt.floor('10min')).agg({
     'avg_price_bought_sats': 'mean',
