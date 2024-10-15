@@ -28,10 +28,10 @@ st.set_page_config(page_title="Gizmo Meme Coin Dashboard", layout="wide", page_i
 # Load data into cache
 st.title("Gizmo Meme Coin Dashboard")
 st.markdown("""
-Welcome to the Gizmo Meme Coin Dashboard! Explore trading metrics, holders' data, and market trends to make informed trading decisions.
+Giz data
 """)
 
-data_load_state = st.text('Loading data...')
+data_load_state = st.text('Loading Giz data...')
 df = load_data()
 data_load_state.text('')
 
