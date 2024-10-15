@@ -155,6 +155,10 @@ price_vs_profit['avg_price_bought_sats'] = price_vs_profit.apply(
     if row['quantity_bought_4h'] > 0 else 0, axis=1
 )
 
+# Find the max values for both y-axes to synchronize their percentage-based scaling
+max_unrealized_profit = price_vs_profit['unrealized_profit'].max()
+max_avg_price = price_vs_profit['avg_price_bought_sats'].max()
+
 fig_price_vs_profit = go.Figure()
 
 # Unrealized profit line
@@ -167,12 +171,12 @@ fig_price_vs_profit.add_trace(go.Scatter(
     x=price_vs_profit['timestamp'], y=price_vs_profit['avg_price_bought_sats'],
     mode='lines', name='Last 4 Hours Avg Price (Sats)', yaxis='y2', line=dict(color='orange')))
 
-# Layout for dual axis
+# Layout for dual axis with synchronized scaling
 fig_price_vs_profit.update_layout(
     title='Unrealized Profit vs. Last 4 Hours Avg Price (Sats)',
     xaxis=dict(title='Timestamp'),
-    yaxis=dict(title='Unrealized Profit (BTC)', side='left'),
-    yaxis2=dict(title='Last 4 Hours Avg Price (Sats)', overlaying='y', side='right'),
+    yaxis=dict(title='Unrealized Profit (BTC)', side='left', range=[0, max_unrealized_profit * 1.1], tickmode='auto'),
+    yaxis2=dict(title='Last 4 Hours Avg Price (Sats)', overlaying='y', side='right', range=[0, max_avg_price * 1.1], tickmode='auto'),
     legend=dict(x=0.1, y=1.1)
 )
 
