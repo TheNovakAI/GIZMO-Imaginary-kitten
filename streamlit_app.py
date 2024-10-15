@@ -43,9 +43,9 @@ st.markdown(f"**Data as of:** {latest_timestamp}")
 # Sidebar filters
 st.sidebar.header("Filters")
 
-# Create input box to let user type the number of top holders they want to display
+# Default number of top holders to "all" holders
 top_holders_limit = st.sidebar.number_input(
-    'Enter the number of top holders (or leave empty for all)', min_value=1, max_value=len(current_df), value=20, step=1)
+    'Enter the number of top holders (default to all)', min_value=1, max_value=len(current_df), value=len(current_df), step=1)
 
 # Filter unique addresses
 unique_addresses = current_df['address'].unique()
@@ -68,14 +68,14 @@ col2.metric("Total Balance", f"{total_balance:,.2f}")
 col3.metric("Total Unrealized Profit", f"{total_unrealized_profit:,.2f} BTC")
 col4.metric("Average Profit Multiplier", f"{average_num_xs_profit:.2f}x")
 
-# Holders Over Time
+# Holders Over Time - Ensure all timestamps are shown
 st.header("Holders Over Time")
-holders_over_time = df[df['balance'] > 0].groupby(
-    df['timestamp'].dt.date)['address'].nunique().reset_index()
-holders_over_time.columns = ['Date', 'Unique Holders']
+holders_over_time = df[df['balance'] > 0].groupby('timestamp')['address'].nunique().reset_index()
+holders_over_time.columns = ['Timestamp', 'Unique Holders']
+
 fig_holders = go.Figure()
-fig_holders.add_trace(go.Scatter(x=holders_over_time['Date'], y=holders_over_time['Unique Holders'], mode='lines+markers', name='Unique Holders'))
-fig_holders.update_layout(title='Number of Unique Holders Over Time', xaxis_title='Date', yaxis_title='Number of Holders')
+fig_holders.add_trace(go.Scatter(x=holders_over_time['Timestamp'], y=holders_over_time['Unique Holders'], mode='lines+markers', name='Unique Holders'))
+fig_holders.update_layout(title='Number of Unique Holders Over Time', xaxis_title='Timestamp', yaxis_title='Number of Holders')
 st.plotly_chart(fig_holders, use_container_width=True)
 
 # Adjusted Balance Distribution
@@ -114,64 +114,62 @@ with col2:
     st.subheader(f"Top Sellers in {selected_interval}")
     st.dataframe(top_sellers[['address', quantity_sold_col, 'value_sold_btc']])
 
-# Unique Buyers and Sellers Over Time (non-cumulative)
+# Unique Buyers and Sellers Over Time (non-cumulative, all timestamps shown)
 st.header("Unique Buyers and Sellers Over Time")
-buyers_sellers_over_time = df.groupby(df['timestamp'].dt.date).agg({
+buyers_sellers_over_time = df.groupby('timestamp').agg({
     'quantity_bought': 'nunique',
     'quantity_sold': 'nunique'
 }).reset_index()
-buyers_sellers_over_time.columns = ['Date', 'Unique Buyers', 'Unique Sellers']
+buyers_sellers_over_time.columns = ['Timestamp', 'Unique Buyers', 'Unique Sellers']
 
 # Create bar chart to compare unique buyers and sellers
 fig_buyers_sellers = go.Figure()
 fig_buyers_sellers.add_trace(go.Bar(
-    x=buyers_sellers_over_time['Date'], y=buyers_sellers_over_time['Unique Buyers'],
+    x=buyers_sellers_over_time['Timestamp'], y=buyers_sellers_over_time['Unique Buyers'],
     name='Unique Buyers', marker_color='green'))
 fig_buyers_sellers.add_trace(go.Bar(
-    x=buyers_sellers_over_time['Date'], y=buyers_sellers_over_time['Unique Sellers'],
+    x=buyers_sellers_over_time['Timestamp'], y=buyers_sellers_over_time['Unique Sellers'],
     name='Unique Sellers', marker_color='red'))
 
 fig_buyers_sellers.update_layout(
     barmode='group',  # Bars will be side-by-side for comparison
-    xaxis_title='Date', yaxis_title='Count',
+    xaxis_title='Timestamp', yaxis_title='Count',
     title='Unique Buyers and Sellers Per Time Interval')
 st.plotly_chart(fig_buyers_sellers, use_container_width=True)
 
 # Price Over Time and Unrealized Profit Comparison
-st.header("Unrealized Profit vs. Average Price Sold in Last 1hr")
+st.header("Unrealized Profit vs. Average Price Over Time (in Sats)")
 
-# Aggregating data for last 1 hour sold
-df['price_sold_last_1hr'] = df['value_sold_btc'] / df['quantity_sold']
-avg_price_sold_1hr = df.groupby(df['timestamp'].dt.floor('10min')).agg({
-    'price_sold_last_1hr': 'mean',
+# Calculate average price as sats per token (using buys only)
+df['avg_price_bought_sats'] = (df['value_bought_1h_btc'] / df['quantity_bought_1h']) / 0.00000001
+
+price_vs_profit = df.groupby(df['timestamp'].dt.floor('10min')).agg({
+    'avg_price_bought_sats': 'mean',
     'unrealized_profit': 'sum'
 }).reset_index()
 
-# Convert price sold to sats/token
-avg_price_sold_1hr['price_sold_last_1hr'] = avg_price_sold_1hr['price_sold_last_1hr'] / 0.00000001
-
-fig_unrealized_vs_price = go.Figure()
+fig_price_vs_profit = go.Figure()
 
 # Unrealized profit line
-fig_unrealized_vs_price.add_trace(go.Scatter(
-    x=avg_price_sold_1hr['timestamp'], y=avg_price_sold_1hr['unrealized_profit'],
+fig_price_vs_profit.add_trace(go.Scatter(
+    x=price_vs_profit['timestamp'], y=price_vs_profit['unrealized_profit'],
     mode='lines', name='Unrealized Profit (BTC)', yaxis='y1', line=dict(color='blue')))
 
-# Avg price sold (in sats)
-fig_unrealized_vs_price.add_trace(go.Scatter(
-    x=avg_price_sold_1hr['timestamp'], y=avg_price_sold_1hr['price_sold_last_1hr'],
-    mode='lines', name='Avg Price Sold L1hr (Sats)', yaxis='y2', line=dict(color='orange')))
+# Avg price bought in sats line
+fig_price_vs_profit.add_trace(go.Scatter(
+    x=price_vs_profit['timestamp'], y=price_vs_profit['avg_price_bought_sats'],
+    mode='lines', name='Avg Price Bought (Sats)', yaxis='y2', line=dict(color='orange')))
 
 # Layout for dual axis
-fig_unrealized_vs_price.update_layout(
-    title='Unrealized Profit vs. Avg Price Sold L1hr',
+fig_price_vs_profit.update_layout(
+    title='Unrealized Profit vs. Avg Price Bought Over Time (Sats)',
     xaxis=dict(title='Timestamp'),
     yaxis=dict(title='Unrealized Profit (BTC)', side='left'),
-    yaxis2=dict(title='Avg Price Sold (Sats)', overlaying='y', side='right'),
+    yaxis2=dict(title='Avg Price Bought (Sats)', overlaying='y', side='right'),
     legend=dict(x=0.1, y=1.1)
 )
 
-st.plotly_chart(fig_unrealized_vs_price, use_container_width=True)
+st.plotly_chart(fig_price_vs_profit, use_container_width=True)
 
 # Footer
 st.markdown("""
