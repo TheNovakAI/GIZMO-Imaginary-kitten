@@ -117,10 +117,10 @@ with col2:
 # Unique Buyers and Sellers Over Time (non-cumulative, showing unique addresses per interval)
 st.header("Unique Buyers and Sellers Over Time")
 
-# Aggregate unique buyers and sellers per timestamp (rolling window)
+# Aggregate unique buyers and sellers per timestamp
 buyers_sellers_over_time = df.groupby('timestamp').agg({
-    'quantity_bought_1h': 'nunique',
-    'quantity_sold_1h': 'nunique'
+    'quantity_bought_4h': 'nunique',  # Changed to 4h for consistency with time window
+    'quantity_sold_4h': 'nunique'
 }).reset_index()
 buyers_sellers_over_time.columns = ['Timestamp', 'Unique Buyers', 'Unique Sellers']
 
@@ -143,7 +143,10 @@ st.plotly_chart(fig_buyers_sellers, use_container_width=True)
 st.header("Unrealized Profit vs. Average Price Over Time (in Sats)")
 
 # Calculate average price as sats per token (using buys only for last 4 hours)
-df['avg_price_bought_sats'] = (df['value_bought_4h_btc'] / df['quantity_bought_4h']) / 0.00000001
+df['avg_price_bought_sats'] = df.apply(
+    lambda row: (row['value_bought_4h_btc'] / row['quantity_bought_4h']) / 0.00000001 
+    if row['quantity_bought_4h'] > 0 else 0, axis=1
+)
 
 price_vs_profit = df.groupby('timestamp').agg({
     'avg_price_bought_sats': 'mean',
