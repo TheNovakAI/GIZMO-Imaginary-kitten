@@ -180,3 +180,4 @@ st.markdown("""
 ---
 *Note: Data is updated every minute. Latest data timestamp is displayed above.*
 """)
+
