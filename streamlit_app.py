@@ -60,12 +60,12 @@ st.header("Key Performance Indicators (KPIs)")
 # Only include holders with a balance > 0 for profit multiplier calculation
 active_holders = current_df[current_df['balance'] > 0]
 total_holders = active_holders['address'].nunique()
-total_balance = round(active_holders['balance'].sum(),0)
+total_balance = active_holders['balance'].sum()
 total_unrealized_profit = active_holders['unrealized_profit'].sum()
 
 col1, col2, col3 = st.columns(3)
 col1.metric("Total Holders", f"{total_holders}")
-col2.metric("Total Balance", f"{total_balance:,.2f}")
+col2.metric("Total Balance", f"{total_balance:,.0f}")
 col3.metric("Total Unrealized Profit", f"{total_unrealized_profit:,.2f} BTC")
 
 # Holders Over Time - Ensure all timestamps are shown
