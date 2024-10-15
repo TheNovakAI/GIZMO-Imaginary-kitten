@@ -57,12 +57,10 @@ if selected_addresses:
 
 # KPI Metrics
 st.header("Key Performance Indicators (KPIs)")
-# Only include holders with a balance > 0 for profit multiplier calculation
-active_holders = current_df[current_df['balance'] > 0]
-total_holders = active_holders['address'].nunique()
-total_balance = active_holders['balance'].sum()
-total_unrealized_profit = active_holders['unrealized_profit'].sum()
-average_num_xs_profit = active_holders['num_xs_profit'].mean()
+total_holders = current_df[current_df['balance'] > 0]['address'].nunique()
+total_balance = current_df['balance'].sum()
+total_unrealized_profit = current_df['unrealized_profit'].sum()
+average_num_xs_profit = current_df['num_xs_profit'].mean()
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Holders", f"{total_holders}")
@@ -116,13 +114,11 @@ with col2:
     st.subheader(f"Top Sellers in {selected_interval}")
     st.dataframe(top_sellers[['address', quantity_sold_col, 'value_sold_btc']])
 
-# Unique Buyers and Sellers Over Time (non-cumulative, showing unique addresses per interval)
+# Unique Buyers and Sellers Over Time (non-cumulative, all timestamps shown)
 st.header("Unique Buyers and Sellers Over Time")
-
-# Aggregate unique buyers and sellers per timestamp (rolling window)
 buyers_sellers_over_time = df.groupby('timestamp').agg({
-    'quantity_bought_1h': 'nunique',
-    'quantity_sold_1h': 'nunique'
+    'quantity_bought': 'nunique',
+    'quantity_sold': 'nunique'
 }).reset_index()
 buyers_sellers_over_time.columns = ['Timestamp', 'Unique Buyers', 'Unique Sellers']
 
@@ -180,4 +176,3 @@ st.markdown("""
 ---
 *Note: Data is updated every minute. Latest data timestamp is displayed above.*
 """)
-
