@@ -1,10 +1,8 @@
 import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine
-import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
-from plotly.subplots import make_subplots
 
 # Function to load data from the PostgreSQL database
 @st.cache_data(ttl=60)
@@ -70,15 +68,14 @@ col2.metric("Total Balance", f"{total_balance:,.2f}")
 col3.metric("Total Unrealized Profit", f"{total_unrealized_profit:,.2f} BTC")
 col4.metric("Average Profit Multiplier", f"{average_num_xs_profit:.2f}x")
 
-# Fixing Holders Over Time
+# Holders Over Time
 st.header("Holders Over Time")
 holders_over_time = df[df['balance'] > 0].groupby(
     df['timestamp'].dt.date)['address'].nunique().reset_index()
 holders_over_time.columns = ['Date', 'Unique Holders']
-fig_holders = px.line(
-    holders_over_time, x='Date', y='Unique Holders',
-    title='Number of Unique Holders Over Time',
-    labels={'Date': 'Date', 'Unique Holders': 'Number of Holders'})
+fig_holders = go.Figure()
+fig_holders.add_trace(go.Scatter(x=holders_over_time['Date'], y=holders_over_time['Unique Holders'], mode='lines+markers', name='Unique Holders'))
+fig_holders.update_layout(title='Number of Unique Holders Over Time', xaxis_title='Date', yaxis_title='Number of Holders')
 st.plotly_chart(fig_holders, use_container_width=True)
 
 # Adjusted Balance Distribution
@@ -88,10 +85,9 @@ balance_labels = ['<10k', '10k-50k', '50k-100k', '100k-500k', '500k-1M', '1M-5M'
 current_df['Balance Range'] = pd.cut(
     current_df['balance'], bins=balance_bins, labels=balance_labels)
 balance_distribution = current_df['Balance Range'].value_counts().sort_index()
-fig_balance_dist = px.bar(
-    balance_distribution, x=balance_distribution.index.astype(str), y=balance_distribution.values,
-    labels={'x': 'Balance Range', 'y': 'Number of Holders'},
-    title='Distribution of Holder Balances')
+fig_balance_dist = go.Figure()
+fig_balance_dist.add_trace(go.Bar(x=balance_distribution.index.astype(str), y=balance_distribution.values, name='Holders'))
+fig_balance_dist.update_layout(title='Distribution of Holder Balances', xaxis_title='Balance Range', yaxis_title='Number of Holders')
 st.plotly_chart(fig_balance_dist, use_container_width=True)
 
 # Top Holders Trading Activity
@@ -141,70 +137,41 @@ fig_buyers_sellers.update_layout(
     title='Unique Buyers and Sellers Per Time Interval')
 st.plotly_chart(fig_buyers_sellers, use_container_width=True)
 
-# Dual Axis Line Chart: Unrealized Profit vs. Average Price Sold (Last 1 Hour)
-st.header("Unrealized Profit vs. Average Price Sold (Last 1 Hour)")
+# Price Over Time and Unrealized Profit Comparison
+st.header("Unrealized Profit vs. Average Price Sold in Last 1hr")
 
-# Group data by date
-unrealized_profit_over_time = df.groupby(df['timestamp'].dt.date)['unrealized_profit'].sum().reset_index()
-avg_price_sold_l1hr = df.groupby(df['timestamp'].dt.date).apply(
-    lambda x: (x['value_sold_btc'].sum() / x['quantity_sold_1h'].sum()) if x['quantity_sold_1h'].sum() != 0 else 0
-).reset_index(name='avg_price_sold_l1hr')
-
-# Merge the two dataframes on the date column
-comparison_df = pd.merge(unrealized_profit_over_time, avg_price_sold_l1hr, on='timestamp')
-
-# Create dual-axis line chart
-fig_dual_axis = make_subplots(specs=[[{"secondary_y": True}]])
-
-# Add unrealized profit line
-fig_dual_axis.add_trace(go.Scatter(
-    x=comparison_df['timestamp'], y=comparison_df['unrealized_profit'],
-    mode='lines', name='Total Unrealized Profit', line=dict(color='green')),
-    secondary_y=False
-)
-
-# Add average price sold (last 1 hour) line
-fig_dual_axis.add_trace(go.Scatter(
-    x=comparison_df['timestamp'], y=comparison_df['avg_price_sold_l1hr'],
-    mode='lines', name='Avg Price Sold (L1hr)', line=dict(color='blue')),
-    secondary_y=True
-)
-
-# Update layout for dual axis
-fig_dual_axis.update_layout(
-    title_text="Total Unrealized Profit vs Avg Price Sold (Last 1 Hour)",
-    xaxis_title="Date",
-    legend_title_text="Metrics",
-)
-
-# Set y-axis titles
-fig_dual_axis.update_yaxes(title_text="Total Unrealized Profit (BTC)", secondary_y=False)
-fig_dual_axis.update_yaxes(title_text="Avg Price Sold (BTC)", secondary_y=True)
-
-# Display the chart in Streamlit
-st.plotly_chart(fig_dual_axis, use_container_width=True)
-
-# Price Over Time
-st.header("Price Over Time")
-df['price_bought'] = df['value_bought_btc'] / df['quantity_bought'].replace(0, np.nan)
-df['price_sold'] = df['value_sold_btc'] / df['quantity_sold'].replace(0, np.nan)
-
-price_over_time = df.groupby(df['timestamp'].dt.date).agg({
-    'price_bought': 'mean',
-    'price_sold': 'mean'
+# Aggregating data for last 1 hour sold
+df['price_sold_last_1hr'] = df['value_sold_btc'] / df['quantity_sold']
+avg_price_sold_1hr = df.groupby(df['timestamp'].dt.floor('10min')).agg({
+    'price_sold_last_1hr': 'mean',
+    'unrealized_profit': 'sum'
 }).reset_index()
 
-fig_price_over_time = go.Figure()
-fig_price_over_time.add_trace(go.Scatter(
-    x=price_over_time['timestamp'], y=price_over_time['price_bought'],
-    mode='lines', name='Average Buy Price', marker_color='blue'))
-fig_price_over_time.add_trace(go.Scatter(
-    x=price_over_time['timestamp'], y=price_over_time['price_sold'],
-    mode='lines', name='Average Sell Price', marker_color='orange'))
-fig_price_over_time.update_layout(
-    xaxis_title='Date', yaxis_title='BTC Price',
-    title='Average Buy and Sell Prices Over Time')
-st.plotly_chart(fig_price_over_time, use_container_width=True)
+# Convert price sold to sats/token
+avg_price_sold_1hr['price_sold_last_1hr'] = avg_price_sold_1hr['price_sold_last_1hr'] / 0.00000001
+
+fig_unrealized_vs_price = go.Figure()
+
+# Unrealized profit line
+fig_unrealized_vs_price.add_trace(go.Scatter(
+    x=avg_price_sold_1hr['timestamp'], y=avg_price_sold_1hr['unrealized_profit'],
+    mode='lines', name='Unrealized Profit (BTC)', yaxis='y1', line=dict(color='blue')))
+
+# Avg price sold (in sats)
+fig_unrealized_vs_price.add_trace(go.Scatter(
+    x=avg_price_sold_1hr['timestamp'], y=avg_price_sold_1hr['price_sold_last_1hr'],
+    mode='lines', name='Avg Price Sold L1hr (Sats)', yaxis='y2', line=dict(color='orange')))
+
+# Layout for dual axis
+fig_unrealized_vs_price.update_layout(
+    title='Unrealized Profit vs. Avg Price Sold L1hr',
+    xaxis=dict(title='Timestamp'),
+    yaxis=dict(title='Unrealized Profit (BTC)', side='left'),
+    yaxis2=dict(title='Avg Price Sold (Sats)', overlaying='y', side='right'),
+    legend=dict(x=0.1, y=1.1)
+)
+
+st.plotly_chart(fig_unrealized_vs_price, use_container_width=True)
 
 # Footer
 st.markdown("""
