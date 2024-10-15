@@ -28,10 +28,10 @@ st.set_page_config(page_title="Gizmo Meme Coin Dashboard", layout="wide", page_i
 # Load data into cache
 st.title("Gizmo Meme Coin Dashboard")
 st.markdown("""
-Welcome to the Gizmo Meme Coin Dashboard! Explore trading metrics, holders' data, and market trends to make informed trading decisions.
+the Giz Data
 """)
 
-data_load_state = st.text('Loading data...')
+data_load_state = st.text('Loading giz data...')
 df = load_data()
 data_load_state.text('')
 
@@ -144,15 +144,15 @@ st.header("Unrealized Profit vs. Average Price Over Time (in Sats)")
 
 # Aggregate values for each timestamp to calculate avg price bought in sats per token
 price_vs_profit = df.groupby('timestamp').agg({
-    'value_bought_4h_btc': 'sum',
-    'quantity_bought_4h': 'sum',
+    'value_bought_1h_btc': 'sum',
+    'quantity_bought_1h': 'sum',
     'unrealized_profit': 'sum'
 }).reset_index()
 
 # Calculate average price as sats per token (total value_bought / total quantity_bought for each timestamp)
 price_vs_profit['avg_price_bought_sats'] = price_vs_profit.apply(
-    lambda row: (row['value_bought_4h_btc'] / row['quantity_bought_4h']) / 0.00000001 
-    if row['quantity_bought_4h'] > 0 else 0, axis=1
+    lambda row: (row['value_bought_1h_btc'] / row['quantity_bought_1h']) / 0.00000001 
+    if row['quantity_bought_1h'] > 0 else 0, axis=1
 )
 
 fig_price_vs_profit = go.Figure()
@@ -165,14 +165,14 @@ fig_price_vs_profit.add_trace(go.Scatter(
 # Avg price bought in sats line
 fig_price_vs_profit.add_trace(go.Scatter(
     x=price_vs_profit['timestamp'], y=price_vs_profit['avg_price_bought_sats'],
-    mode='lines', name='Last 4 Hours Avg Price (Sats)', yaxis='y2', line=dict(color='orange')))
+    mode='lines', name='EMA 1 Hour Price (Sats)', yaxis='y2', line=dict(color='orange')))
 
 # Layout for dual axis
 fig_price_vs_profit.update_layout(
-    title='Unrealized Profit vs. Last 4 Hours Avg Price (Sats)',
+    title='Unrealized Profit vs. EMA 1 Hour Price (Sats)',
     xaxis=dict(title='Timestamp'),
     yaxis=dict(title='Unrealized Profit (BTC)', side='left'),
-    yaxis2=dict(title='Last 4 Hours Avg Price (Sats)', overlaying='y', side='right'),
+    yaxis2=dict(title='EMA 1 Hour Price (Sats)', overlaying='y', side='right'),
     legend=dict(x=0.1, y=1.1)
 )
 
