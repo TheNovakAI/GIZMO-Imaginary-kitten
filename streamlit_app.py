@@ -62,13 +62,11 @@ active_holders = current_df[current_df['balance'] > 0]
 total_holders = active_holders['address'].nunique()
 total_balance = active_holders['balance'].sum()
 total_unrealized_profit = active_holders['unrealized_profit'].sum()
-average_num_xs_profit = active_holders['num_xs_profit'].mean()
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4 = st.columns(3)
 col1.metric("Total Holders", f"{total_holders}")
 col2.metric("Total Balance", f"{total_balance:,.2f}")
 col3.metric("Total Unrealized Profit", f"{total_unrealized_profit:,.2f} BTC")
-col4.metric("Average Profit Multiplier", f"{average_num_xs_profit:.2f}x")
 
 # Holders Over Time - Ensure all timestamps are shown
 st.header("Holders Over Time")
