@@ -14,10 +14,16 @@ def load_data():
         f"@{db_credentials['host']}:{db_credentials['port']}/{db_credentials['dbname']}"
     )
     engine = create_engine(connection_string)
-    query = """
-    SELECT * FROM gizmo_holders_balances_history;
-    """
-    df = pd.read_sql_query(query, engine)
+    
+    try:
+        with engine.connect() as connection:
+            query = """
+            SELECT * FROM gizmo_holders_balances_history;
+            """
+            df = pd.read_sql_query(query, connection)
+    finally:
+        engine.dispose()  # Ensure the connection is properly closed
+
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df.fillna(0, inplace=True)  # Replace null values with 0
     return df
